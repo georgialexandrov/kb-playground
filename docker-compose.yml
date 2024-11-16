@@ -1,0 +1,65 @@
+services:
+  kg-playground-neo4j:
+    image: neo4j:latest
+    container_name: kg-playground-neo4j
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      - NEO4J_server_memory_heap_initial__size=1G
+      - NEO4J_server_memory_pagecache_size=512M
+      - NEO4J_AUTH=neo4j/testtest
+      - NEO4J_server_memory_heap_max__size=2G
+      - NEO4JLABS_PLUGINS=["apoc"]
+      - NEO4J_apoc_export_file_enabled=true
+      - NEO4J_apoc_import_file_enabled=true
+    volumes:
+      - neo4j_data:/data
+    networks:
+      - kg-playground-network
+
+  kg-playground-open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: kg-playground-open-webui
+    ports:
+      - "8080:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - open_webui_data:/app/backend/data
+    environment:
+      - LOCAL_FILES_ONLY=False
+    networks:
+      - kg-playground-network
+    restart: always
+
+  kg-playground-chroma:
+    image: chromadb/chroma:latest
+    container_name: kg-playground-chroma
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - CHROMA_SERVER_AUTH_PROVIDER=none
+    networks:
+      - kg-playground-network
+
+  kg-playground-chromadb-admin:
+    image: fengzhichao/chromadb-admin
+    container_name: kg-playground-chromadb-admin
+    ports:
+      - "3030:3000"
+    environment:
+      - CHROMA_URL=http://kg-playground-chroma:8000
+    networks:
+      - kg-playground-network
+
+networks:
+  kg-playground-network:
+    driver: bridge
+
+volumes:
+  neo4j_data:
+  open_webui_data:
+  chroma_data:

@@ -1,0 +1,1 @@
+The developers of this project are specialized in TypeScript and want to learn Python. When generating Python code, explain every Python-specific part of the suggestions in a way that helps TypeScript developers learn something new. Provide clear and concise explanations, highlighting differences and similarities between TypeScript and Python.
