@@ -1,11 +1,9 @@
 import os
 import chromadb
 from chromadb.config import DEFAULT_TENANT, DEFAULT_DATABASE, Settings
-# from llama_index.graph_stores.neo4j import Neo4jGraphStore
 from neo4j import GraphDatabase
 from langchain.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
-from langsmith import traceable
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -22,12 +20,6 @@ chroma_client = chromadb.HttpClient(
 # 
 collection = chroma_client.get_collection("project_knowledge")
 
-chromadb_result = collection.query(
-    query_texts=["What is the AI Chatbot project about?"],
-    # query_texts=["What is the aim of The Website Redesign?"],
-    n_results=1
-)
-
 neo4j_client = GraphDatabase.driver(
   uri=os.getenv("NEO4J_URI"),
   auth=(os.getenv("NEO4J_USER"), os.getenv("NEO4J_PASSWORD"))
@@ -35,15 +27,64 @@ neo4j_client = GraphDatabase.driver(
 
 session = neo4j_client.session(database=os.getenv("NEO4J_DATABASE"))
 
-query = """
-MATCH (p:Project {name: "AI Chatbot"})<-[:WORKS_ON]-(person)
-RETURN person.name, person.role;
-"""
+def get_schema():
+  query = "CALL db.schema.visualization()"
+  result = session.run(query).data()
+  return result
 
-neo4j_result = session.run(query).data()
-print(neo4j_result)
+schema = get_schema()
+print(schema)
 
 llm = ChatOpenAI(model_name=os.getenv("OPENAI_MODEL"))
+
+template = """
+Based on the following Neo4j schema, generate a Cypher query to retrieve structured data relevant to the user's question:
+Neo4j schema: {schema}
+User question: {query}
+
+The response must be a valid Cypher query that can be executed directly in a Neo4j database. Do not include any additional information, formatting, or markdown. Only return the Cypher query.
+"""
+
+neo4j_prompt = PromptTemplate(
+    input_variables=["schema", "query"],
+    template=template
+)
+
+neo4j_chain = neo4j_prompt | llm
+# user_query = 'Who manages the AI Chatbot?'
+user_query = 'What is the focus of the AI Chatbot project and who works there?'
+neo4j_response = neo4j_chain.invoke({
+    "schema": schema,
+    "query": user_query
+})
+print(neo4j_response.content)
+
+neo4j_result = session.run(neo4j_response.content).data()
+
+chroma_prompt_template = """
+Based on the user's question, generate a query to retrieve relevant unstructured data from ChromaDB:
+User question: {query}
+
+The response must be a valid query text that can be used to query ChromaDB. Do not include any additional information, formatting, or markdown. Only return the query text.
+"""
+
+chroma_prompt = PromptTemplate(
+  input_variables=["query"],
+  template=chroma_prompt_template
+)
+
+chroma_chain = chroma_prompt | llm
+chroma_query_response = chroma_chain.invoke({
+  "query": user_query
+})
+
+chroma_query_text = chroma_query_response.content.strip()
+
+print(chroma_query_text)
+chromadb_result = collection.query(
+  query_texts=[chroma_query_text],
+  n_results=1
+)
 
 template = """
 Use the following context:
@@ -58,8 +99,8 @@ prompt = PromptTemplate(
 )
 
 chain = prompt | llm
-# user_query = 'Who manages the AI Chatbot?'
-user_query = 'What is the focus of the AI Chatbot project and who works there?'
+user_query = 'Who manages the AI Chatbot?'
+# user_query = 'What is the focus of the AI Chatbot project and who works there?'
 response = chain.invoke({
     "structured_data": neo4j_result,
     "unstructured_data": chromadb_result,
