@@ -5,3 +5,4 @@ langchain-community
 langchain-openai
 langsmith
 neo4j
+langgraph

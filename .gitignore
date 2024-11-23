@@ -1,5 +1,6 @@
 .venv
 .env
+__pycache__
 docker/neo4j
 docker/open-webui
 docker/chroma
