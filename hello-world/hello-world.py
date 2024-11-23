@@ -35,7 +35,7 @@ def get_schema():
 schema = get_schema()
 print(schema)
 
-llm = ChatOpenAI(model_name=os.getenv("OPENAI_MODEL"))
+llm = ChatOpenAI(model_name=os.getenv("OPENAI_MODEL"), temperature=0.0)
 
 template = """
 Based on the following Neo4j schema, generate a Cypher query to retrieve structured data relevant to the user's question:
@@ -51,8 +51,8 @@ neo4j_prompt = PromptTemplate(
 )
 
 neo4j_chain = neo4j_prompt | llm
-# user_query = 'Who manages the AI Chatbot?'
-user_query = 'What is the focus of the AI Chatbot project and who works there?'
+user_query = 'Who manages the AI Chatbot?'
+# user_query = 'What is the focus of the AI Chatbot project and who works there?'
 neo4j_response = neo4j_chain.invoke({
     "schema": schema,
     "query": user_query
@@ -99,7 +99,7 @@ prompt = PromptTemplate(
 )
 
 chain = prompt | llm
-user_query = 'Who manages the AI Chatbot?'
+
 # user_query = 'What is the focus of the AI Chatbot project and who works there?'
 response = chain.invoke({
     "structured_data": neo4j_result,
